@@ -1,19 +1,23 @@
 const express = require("express");
 const router = express.Router();
 const Task = require("../models/taskModel");
+const auth = require("../middleware/auth");
 
 router.get("/tasks", async (req, res) => {
   try {
-    const data = await Task.find({});
-    res.send(data);
+    await req.user.populate("tasks").execPopulate();
+    res.send(req.user.tasks);
   } catch (e) {
     res.status(400).send(e);
   }
 });
 
-router.post("/tasks", async (req, res) => {
+router.post("/tasks", auth, async (req, res) => {
   try {
-    const task = new Task(req.body);
+    const task = new Task({
+      ...req.body,
+      createdBy: req.user._id,
+    });
     await task.save();
     res.send(task);
   } catch (e) {
@@ -21,10 +25,26 @@ router.post("/tasks", async (req, res) => {
   }
 });
 
-router.get("/tasks", async (req, res) => {
+router.patch("/tasks/:id", auth, async (req, res) => {
   try {
-    const tasks = await Task.find({});
-    res.send(tasks);
+    const task = await Task.findOne({
+      createdBy: req.user._id,
+      _id: req.params.id,
+    });
+    if (!task) return res.status(404).send();
+
+    Object.keys(req.body).forEach(
+      (update) => (task[update] = req.body[update])
+    );
+    await task.save();
+  } catch (e) {
+    res.status(404).send();
+  }
+});
+
+router.get("/task/:id", auth, async (req, res) => {
+  try {
+    const task = await Task.findOne({ createdBy: req.user, _id: req.body.id });
   } catch (e) {
     res.status(500).send();
   }
